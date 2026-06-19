@@ -1,0 +1,28 @@
+name: Fund Radar
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: |
+          pip install requests
+
+      - name: Run Fund Radar
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+
+        run: |
+          python fund-radar.py
