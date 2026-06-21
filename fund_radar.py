@@ -6,14 +6,41 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 DART_API_KEY = os.environ["DART_API_KEY"]
 
-# 날짜
-today = datetime.today()
-yesterday = today - timedelta(days=3)
 
-bgn = yesterday.strftime("%Y%m%d")
+def is_fund_disclosure(title):
+
+    # 반드시 집합투자증권 포함
+    if "집합투자증권" not in title:
+        return False
+
+    # 제외할 공시
+    exclude = [
+        "채무증권",
+        "주식",
+        "파생결합",
+        "정정"
+    ]
+
+    if any(x in title for x in exclude):
+        return False
+
+    # 포함할 공시
+    include = [
+        "증권신고서",
+        "효력발생",
+        "투자설명서"
+    ]
+
+    return any(x in title for x in include)
+
+
+# 최근 3일 조회
+today = datetime.today()
+start_day = today - timedelta(days=3)
+
+bgn = start_day.strftime("%Y%m%d")
 end = today.strftime("%Y%m%d")
 
-# DART 공시 검색
 url = "https://opendart.fss.or.kr/api/list.json"
 
 params = {
@@ -28,42 +55,41 @@ data = r.json()
 
 message = "🔔 Fund Radar\n\n"
 
-# 신규 펀드 관련 키워드
-keywords = [
-    "집합투자",
-    "증권신고서",
-    "효력발생",
-    "ETF",
-    "투자설명서"
-]
-
 results = []
 
 if data.get("status") == "000":
 
-    for item in data["list"]:
+    for item in data.get("list", []):
 
         title = item.get("report_nm", "")
         corp = item.get("corp_name", "")
         date = item.get("rcept_dt", "")
 
-        if any(k in title for k in keywords):
+        if is_fund_disclosure(title):
+
+            icon = "🔹"
+
+            if "효력발생" in title:
+                icon = "🟢"
+
+            elif "증권신고서" in title:
+                icon = "🟡"
 
             results.append(
+                f"{icon} 신규 집합투자증권 공시\n"
                 f"운용사 : {corp}\n"
-                f"공시 : {title}\n"
+                f"공시명 : {title}\n"
                 f"접수일 : {date}\n"
             )
 
 if results:
 
-    message += "\n----------------\n".join(results)
+    message += "\n----------------------\n".join(results)
 
 else:
 
-    message += "최근 신규 펀드 관련 공시가 없습니다."
+    message += "최근 집합투자증권 신규 공시가 없습니다."
 
-# 텔레그램 발송
 
 telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
