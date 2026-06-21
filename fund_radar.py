@@ -6,12 +6,14 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 DART_API_KEY = os.environ["DART_API_KEY"]
 
+# 날짜
 today = datetime.today()
-yesterday = today - timedelta(days=1)
+yesterday = today - timedelta(days=3)
 
 bgn = yesterday.strftime("%Y%m%d")
 end = today.strftime("%Y%m%d")
 
+# DART 공시 검색
 url = "https://opendart.fss.or.kr/api/list.json"
 
 params = {
@@ -24,40 +26,44 @@ params = {
 r = requests.get(url, params=params)
 data = r.json()
 
-msg = "🔔 Fund Radar\n\n"
+message = "🔔 Fund Radar\n\n"
 
-if data["status"] == "000":
+# 신규 펀드 관련 키워드
+keywords = [
+    "집합투자",
+    "증권신고서",
+    "효력발생",
+    "ETF",
+    "투자설명서"
+]
 
-    keywords = [
-        "집합투자",
-        "ETF",
-        "증권신고서",
-        "효력발생",
-        "투자설명서"
-    ]
+results = []
 
-    found = False
+if data.get("status") == "000":
 
     for item in data["list"]:
 
-        title = item["report_nm"]
+        title = item.get("report_nm", "")
+        corp = item.get("corp_name", "")
+        date = item.get("rcept_dt", "")
 
         if any(k in title for k in keywords):
 
-            found = True
-
-            msg += (
-                f"운용사 : {item['corp_name']}\n"
+            results.append(
+                f"운용사 : {corp}\n"
                 f"공시 : {title}\n"
-                f"날짜 : {item['rcept_dt']}\n\n"
+                f"접수일 : {date}\n"
             )
 
-    if not found:
-        msg += "신규 펀드 관련 공시가 없습니다."
+if results:
+
+    message += "\n----------------\n".join(results)
 
 else:
 
-    msg += "DART 조회 실패"
+    message += "최근 신규 펀드 관련 공시가 없습니다."
+
+# 텔레그램 발송
 
 telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -65,8 +71,8 @@ requests.post(
     telegram_url,
     data={
         "chat_id": CHAT_ID,
-        "text": msg
+        "text": message
     }
 )
 
-print(msg)
+print(message)
