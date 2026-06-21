@@ -7,98 +7,143 @@ CHAT_ID = os.environ["CHAT_ID"]
 DART_API_KEY = os.environ["DART_API_KEY"]
 
 
-def is_fund_disclosure(title):
+def classify(title):
 
-    # 반드시 집합투자증권 포함
-    if "집합투자증권" not in title:
-        return False
+    if title.startswith("증권신고서(집합투자증권"):
 
-    # 제외할 공시
-    exclude = [
-        "채무증권",
-        "주식",
-        "파생결합",
-        "정정"
-    ]
+        return (
+            "🟡 신규 집합투자증권",
+            "D+3 ~ D+7"
+        )
 
-    if any(x in title for x in exclude):
-        return False
+    if "집합투자증권" in title and "효력발생" in title:
 
-    # 포함할 공시
-    include = [
-        "증권신고서",
-        "효력발생",
-        "투자설명서"
-    ]
+        return (
+            "🟢 설정 임박",
+            "오늘 ~ 내일"
+        )
 
-    return any(x in title for x in include)
+    if "집합투자증권" in title and "투자설명서" in title:
+
+        return (
+            "🔵 판매 개시",
+            "D+0 ~ D+2"
+        )
+
+    return None
 
 
-# 최근 3일 조회
 today = datetime.today()
-start_day = today - timedelta(days=3)
 
-bgn = start_day.strftime("%Y%m%d")
-end = today.strftime("%Y%m%d")
+start = today - timedelta(days=5)
+
+
+params = {
+
+    "crtfc_key": DART_API_KEY,
+
+    "bgn_de": start.strftime("%Y%m%d"),
+
+    "end_de": today.strftime("%Y%m%d"),
+
+    "page_count": 100
+
+}
+
 
 url = "https://opendart.fss.or.kr/api/list.json"
 
-params = {
-    "crtfc_key": DART_API_KEY,
-    "bgn_de": bgn,
-    "end_de": end,
-    "page_count": 100
-}
 
 r = requests.get(url, params=params)
+
 data = r.json()
 
-message = "🔔 Fund Radar\n\n"
+
+message = "🔔 Fund Radar 2.1\n\n"
+
 
 results = []
 
+
 if data.get("status") == "000":
 
-    for item in data.get("list", []):
+    for item in data["list"]:
 
-        title = item.get("report_nm", "")
-        corp = item.get("corp_name", "")
-        date = item.get("rcept_dt", "")
+        title = item["report_nm"]
 
-        if is_fund_disclosure(title):
+        info = classify(title)
 
-            icon = "🔹"
 
-            if "효력발생" in title:
-                icon = "🟢"
+        if info:
 
-            elif "증권신고서" in title:
-                icon = "🟡"
+            status, eta = info
+
+            corp = item["corp_name"]
+
+            date = item["rcept_dt"]
+
+            rcept_no = item["rcept_no"]
+
+
+            dart_link = (
+
+                "https://dart.fss.or.kr/dsaf001/main.do?"
+
+                f"rcpNo={rcept_no}"
+
+            )
+
 
             results.append(
-                f"{icon} 신규 집합투자증권 공시\n"
+
+                f"{status}\n\n"
+
                 f"운용사 : {corp}\n"
-                f"공시명 : {title}\n"
+
+                f"공시 : {title}\n"
+
                 f"접수일 : {date}\n"
+
+                f"예상설정 : {eta}\n\n"
+
+                f"공시보기\n{dart_link}"
+
             )
+
 
 if results:
 
-    message += "\n----------------------\n".join(results)
+    message += "\n\n━━━━━━━━━━\n\n".join(results)
 
 else:
 
     message += "최근 집합투자증권 신규 공시가 없습니다."
 
 
-telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+telegram_url = (
+
+    f"https://api.telegram.org/bot"
+
+    f"{BOT_TOKEN}/sendMessage"
+
+)
+
 
 requests.post(
+
     telegram_url,
+
     data={
+
         "chat_id": CHAT_ID,
-        "text": message
+
+        "text": message,
+
+        "disable_web_page_preview": True
+
     }
+
 )
+
 
 print(message)
