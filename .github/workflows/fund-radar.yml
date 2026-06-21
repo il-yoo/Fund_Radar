@@ -25,4 +25,4 @@ jobs:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
 
         run: |
-          python fund-radar.py
+          python fund_radar.py
